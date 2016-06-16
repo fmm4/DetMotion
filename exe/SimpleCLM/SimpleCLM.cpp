@@ -57,6 +57,8 @@
 #include <opencv2/videoio/videoio_c.h>  // Video write
 
 
+#define CALCULATE_POSE false
+
 #define INFO_STREAM( stream ) \
 std::cout << stream << std::endl
 
@@ -117,13 +119,16 @@ void visualise_tracking(Mat& captured_image, Mat_<float>& depth_image, const CLM
 
 		vis_certainty = (vis_certainty + 1) / (visualisation_boundary + 1);
 
-		// A rough heuristic for box around the face width
-		int thickness = (int)std::ceil(2.0* ((double)captured_image.cols) / 640.0);
-
-		Vec6d pose_estimate_to_draw = CLMTracker::GetCorrectedPoseWorld(clm_model, fx, fy, cx, cy);
-
-		// Draw it in reddish if uncertain, blueish if certain
-		CLMTracker::DrawBox(captured_image, pose_estimate_to_draw, Scalar((1 - vis_certainty)*255.0, 0, vis_certainty * 255), thickness, fx, fy, cx, cy);
+		if (CALCULATE_POSE){
+			Vec6d pose_estimate_to_draw;
+			// A rough heuristic for box around the face width
+			int thickness = (int)std::ceil(2.0* ((double)captured_image.cols) / 640.0);
+	
+			pose_estimate_to_draw = CLMTracker::GetCorrectedPoseWorld(clm_model, fx, fy, cx, cy);
+	
+			// Draw it in reddish if uncertain, blueish if certain
+			CLMTracker::DrawBox(captured_image, pose_estimate_to_draw, Scalar((1 - vis_certainty)*255.0, 0, vis_certainty * 255), thickness, fx, fy, cx, cy);
+		}
 
 	}
 
@@ -381,13 +386,15 @@ int main (int argc, char **argv)
 
 			// Work out the pose of the head from the tracked model
 			Vec6d pose_estimate_CLM;
-			if(use_world_coordinates)
-			{
-				pose_estimate_CLM = CLMTracker::GetCorrectedPoseWorld(clm_model, fx, fy, cx, cy);
-			}
-			else
-			{
-				pose_estimate_CLM = CLMTracker::GetCorrectedPoseCamera(clm_model, fx, fy, cx, cy);
+			if (CALCULATE_POSE){
+				if(use_world_coordinates)
+				{
+					pose_estimate_CLM = CLMTracker::GetCorrectedPoseWorld(clm_model, fx, fy, cx, cy);
+				}
+				else
+				{
+					pose_estimate_CLM = CLMTracker::GetCorrectedPoseCamera(clm_model, fx, fy, cx, cy);
+				}
 			}
 
 			// Visualising the results
@@ -422,7 +429,7 @@ int main (int argc, char **argv)
 			}
 
 			// Output the estimated head pose
-			if(!pose_output_files.empty())
+			if(!pose_output_files.empty() && CALCULATE_POSE)
 			{
 				double confidence = 0.5 * (1 - clm_model.detection_certainty);
 				pose_output_file << frame_count + 1 << ", " << time_stamp << ", " << confidence << ", " << detection_success
