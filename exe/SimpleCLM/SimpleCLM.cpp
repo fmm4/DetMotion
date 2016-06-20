@@ -58,6 +58,7 @@
 
 
 #define CALCULATE_POSE false
+vector<Point2i> actualLandmarks;
 
 #define INFO_STREAM( stream ) \
 std::cout << stream << std::endl
@@ -67,6 +68,8 @@ std::cout << "Warning: " << stream << std::endl
 
 #define ERROR_STREAM( stream ) \
 std::cout << "Error: " << stream << std::endl
+
+void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks);
 
 static void printErrorAndAbort( const std::string & error )
 {
@@ -97,7 +100,7 @@ double fps_tracker = -1.0;
 int64 t0 = 0;
 
 // Visualising the results
-void visualise_tracking(Mat& captured_image, Mat_<float>& depth_image, const CLMTracker::CLM& clm_model, const CLMTracker::CLMParameters& clm_parameters, int frame_count, double fx, double fy, double cx, double cy)
+void visualise_tracking(Mat& captured_image, Mat_<float>& depth_image, const CLMTracker::CLM& clm_model, const CLMTracker::CLMParameters& clm_parameters, int frame_count, double fx, double fy, double cx, double cy, vector<Point2i>* landMarks)
 {
 
 	// Drawing the facial landmarks on the face and the bounding box around it if tracking is successful and initialised
@@ -109,7 +112,7 @@ void visualise_tracking(Mat& captured_image, Mat_<float>& depth_image, const CLM
 	// Only draw if the reliability is reasonable, the value is slightly ad-hoc
 	if (detection_certainty < visualisation_boundary)
 	{
-		CLMTracker::Draw(captured_image, clm_model);
+		CLMTracker::Draw(captured_image, clm_model, landMarks);
 
 		double vis_certainty = detection_certainty;
 		if (vis_certainty > 1)
@@ -401,7 +404,9 @@ int main (int argc, char **argv)
 			// Drawing the facial landmarks on the face and the bounding box around it if tracking is successful and initialised
 			double detection_certainty = clm_model.detection_certainty;
 
-			visualise_tracking(captured_image, depth_image, clm_model, clm_parameters, frame_count, fx, fy, cx, cy);
+			visualise_tracking(captured_image, depth_image, clm_model, clm_parameters, frame_count, fx, fy, cx, cy, &actualLandmarks);
+			showImageWithLandMarks(captured_image, actualLandmarks);
+			actualLandmarks.clear();
 
 			// Output the detected facial landmarks
 			if(!landmark_output_files.empty())
@@ -482,3 +487,20 @@ int main (int argc, char **argv)
 	return 0;
 }
 
+void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks){
+	int thickness = (int)std::ceil(5.0* ((double)capturedImage.cols) / 640.0);
+	int thickness_2 = (int)std::ceil(1.5* ((double)capturedImage.cols) / 640.0);
+
+	Mat img = capturedImage.clone();
+
+	Point2i featurePoint;
+	for (int i = 0; i < landMarks.size(); i++){
+		featurePoint.x = landMarks.at(i).x;
+		featurePoint.y = landMarks.at(i).y;
+
+		cv::circle(img, featurePoint, 1, Scalar(0, 0, 255), thickness);
+		cv::circle(img, featurePoint, 1, Scalar(255, 0, 0), thickness_2);
+	}
+
+	imshow("LandMarks Vector", img);
+}

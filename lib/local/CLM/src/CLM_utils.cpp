@@ -1027,7 +1027,7 @@ vector<cv::Point2d> CalculateLandmarks(CLM& clm_model)
 }
 
 // Drawing landmarks on a face image
-void Draw(cv::Mat img, const Mat_<double>& shape2D, const Mat_<int>& visibilities)
+void Draw(cv::Mat img, const Mat_<double>& shape2D, const Mat_<int>& visibilities, vector<Point2i>* landMarks)
 {
 	int n = shape2D.rows/2;
 
@@ -1039,6 +1039,8 @@ void Draw(cv::Mat img, const Mat_<double>& shape2D, const Mat_<int>& visibilitie
 			if(visibilities.at<int>(i))
 			{
 				Point featurePoint((int)shape2D.at<double>(i), (int)shape2D.at<double>(i +n));
+
+				landMarks->push_back(featurePoint);
 
 				// A rough heuristic for drawn point size
 				int thickness = (int)std::ceil(3.0* ((double)img.cols) / 640.0);
@@ -1103,7 +1105,7 @@ void Draw(cv::Mat img, const Mat_<double>& shape2D, const Mat_<int>& visibilitie
 }
 
 // Drawing landmarks on a face image
-void Draw(cv::Mat img, const Mat_<double>& shape2D)
+void Draw(cv::Mat img, const Mat_<double>& shape2D, vector<Point2i>* landMarks)
 {
 	
 	int n;
@@ -1128,6 +1130,9 @@ void Draw(cv::Mat img, const Mat_<double>& shape2D)
 		{
 			featurePoint = Point((int)shape2D.at<double>(i, 0), (int)shape2D.at<double>(i, 1));
 		}
+
+		landMarks->push_back(featurePoint);
+
 		// A rough heuristic for drawn point size
 		int thickness = (int)std::ceil(5.0* ((double)img.cols) / 640.0);
 		int thickness_2 = (int)std::ceil(1.5* ((double)img.cols) / 640.0);
@@ -1140,20 +1145,20 @@ void Draw(cv::Mat img, const Mat_<double>& shape2D)
 }
 
 // Drawing detected landmarks on a face image
-void Draw(cv::Mat img, const CLM& clm_model)
+void Draw(cv::Mat img, const CLM& clm_model, vector<Point2i>* landMarks)
 {
 
 	int idx = clm_model.patch_experts.GetViewIdx(clm_model.params_global, 0);
 
 	// Because we only draw visible points, need to find which points patch experts consider visible at a certain orientation
-	Draw(img, clm_model.detected_landmarks, clm_model.patch_experts.visibilities[0][idx]);
+	Draw(img, clm_model.detected_landmarks, clm_model.patch_experts.visibilities[0][idx], landMarks);
 
 	// If the model has hierarchical updates draw those too
 	for(size_t i = 0; i < clm_model.hierarchical_models.size(); ++i)
 	{
 		if(clm_model.hierarchical_models[i].pdm.NumberOfPoints() != clm_model.hierarchical_mapping[i].size())
 		{
-			Draw(img, clm_model.hierarchical_models[i]);
+			Draw(img, clm_model.hierarchical_models[i], landMarks);
 		}
 	}
 }
