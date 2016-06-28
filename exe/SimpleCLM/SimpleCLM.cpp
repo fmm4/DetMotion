@@ -56,6 +56,31 @@
 #include <opencv2/videoio/videoio.hpp>  // Video write
 #include <opencv2/videoio/videoio_c.h>  // Video write
 
+enum EEmotion{
+	UNKNOWN = 0,
+	HAPPY = 1,
+	SAD = 2,
+	NORMAL = 3
+};
+
+struct eye_struct{
+	double eye_height;
+};
+
+struct eyebrow_struct{
+	double eyebrow_height;
+};
+
+struct mouth_struct{
+	double mouth_height;
+};
+
+struct face_struct{
+	eye_struct leftEye, rightEye;
+	eyebrow_struct leftEyebrow, rightEyebrow;
+	mouth_struct mouth;
+	EEmotion emotion;
+};
 
 #define PI 3.1415926535897
 #define CALCULATE_POSE false
@@ -74,6 +99,29 @@ void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks);
 vector<Point2i> getNormalizedLandMarks(Mat capturedImage, vector<Point2i> landMarks);
 Point2i rotate_point(Point2i center, Point2i p, float angle);
 Point2i scale_point(Point2i center, Point2i p, float scale);
+
+face_struct		getFeatureFace(vector<Point2i> landMarks);
+
+vector<Point2i> getLeftEye(vector<Point2i> landMarks);
+vector<Point2i> getRightEye(vector<Point2i> landMarks);
+vector<Point2i> getLeftEyebrow(vector<Point2i> landMarks);
+vector<Point2i> getRightEyebrow(vector<Point2i> landMarks);
+vector<Point2i> getMouth(vector<Point2i> landMarks);
+
+eye_struct		getFeatureEye(vector<Point2i> eyeLandmarks);
+eyebrow_struct	getFeatureEyebrow(vector<Point2i> eyebrowLandmarks);
+mouth_struct	getFeatureMouth(vector<Point2i> mouthLandmarks);
+
+double getHeightEye(vector<Point2i> eyeLandmarks);
+double getHeightEyebrow(vector<Point2i> eyebrowLandmarks);
+double getHeightMouth(vector<Point2i> mouthLandmarks);
+
+EEmotion getEmotion(face_struct actualFace);
+double getDistance(face_struct actualFace, face_struct baseFace);
+
+double getEyeDistance(eye_struct actualEye, eye_struct baseEye);
+double getEyebrowDistance(eyebrow_struct actualEyebrow, eyebrow_struct baseEyebrow);
+double getMouthDistance(mouth_struct actualMouth, mouth_struct baseMouth);
 
 static void printErrorAndAbort( const std::string & error )
 {
