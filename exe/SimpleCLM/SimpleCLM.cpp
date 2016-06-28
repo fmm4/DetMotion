@@ -57,6 +57,7 @@
 #include <opencv2/videoio/videoio_c.h>  // Video write
 
 
+#define PI 3.1415926535897
 #define CALCULATE_POSE false
 vector<Point2i> actualLandmarks;
 
@@ -70,6 +71,7 @@ std::cout << "Warning: " << stream << std::endl
 std::cout << "Error: " << stream << std::endl
 
 void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks);
+Point2i rotate_point(Point2i center, Point2i p, float angle);
 
 static void printErrorAndAbort( const std::string & error )
 {
@@ -500,7 +502,91 @@ void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks){
 
 		cv::circle(img, featurePoint, 1, Scalar(0, 0, 255), thickness);
 		cv::circle(img, featurePoint, 1, Scalar(255, 0, 0), thickness_2);
+
+		cv::putText(img, to_string(i), featurePoint, CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+	}
+
+	if (landMarks.size() > 0){
+		//face começa em 0 e termina em 16
+		int catetoOposto, catetoAdjacente, hipotenusa;
+		double sen, arcosenoRad, arcosenoDegree;
+		catetoOposto = abs(landMarks[0].y - landMarks[16].y);
+		catetoAdjacente = abs(landMarks[16].x - landMarks[0].x);
+		hipotenusa = sqrt(pow(catetoOposto, 2) + pow(catetoAdjacente, 2));
+		//if do not cast at least one of the arguments to double the division always returns 0
+		sen = ((double)catetoOposto / (double)hipotenusa);
+		arcosenoRad = asin(sen);
+		arcosenoDegree = arcosenoRad * 180 / PI;
+
+		int firstLineY = 30;
+		int linePxSize = 20;
+
+		string line0 = "Cateto Oposto: ";
+		line0.append(to_string(catetoOposto));
+		string line1 = "Cateto Adjacente: ";
+		line1.append(to_string(catetoAdjacente));
+		string line2 = "Hipotenusa: ";
+		line2.append(to_string(hipotenusa));
+		string line3 = "Seno: ";
+		line3.append(to_string(sen));
+		string line4 = "Arcoseno: ";
+		line4.append(to_string(arcosenoDegree));
+		
+
+
+		cv::putText(img, line0, Point(0, firstLineY + 0*linePxSize), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, line1, Point(0, firstLineY + 1*linePxSize), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, line2, Point(0, firstLineY + 2*linePxSize), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, line3, Point(0, firstLineY + 3*linePxSize), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, line4, Point(0, firstLineY + 4*linePxSize), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+
+		//nariz = 33
+		Mat img2 = Mat::ones(img.size(), img.type());
+		Point2i rotatedDeslocatedFeaturePoint;
+		int deslocationX = (img.cols/2) - landMarks[33].x;
+		int deslocationY = (img.rows/2) - landMarks[33].y;
+
+		for (int i = 0; i < landMarks.size(); i++){
+			featurePoint.x = landMarks.at(i).x;
+			featurePoint.y = landMarks.at(i).y;
+
+			
+			if (landMarks[16].y < landMarks[0].y)
+				rotatedDeslocatedFeaturePoint = rotate_point(landMarks[33], featurePoint, arcosenoRad);
+			else
+				rotatedDeslocatedFeaturePoint = rotate_point(landMarks[33], featurePoint, -arcosenoRad);
+
+			rotatedDeslocatedFeaturePoint.x += deslocationX;
+			rotatedDeslocatedFeaturePoint.y += deslocationY;
+			
+			cv::circle(img2, rotatedDeslocatedFeaturePoint, 1, Scalar(0, 0, 255), thickness);
+			cv::circle(img2, rotatedDeslocatedFeaturePoint, 1, Scalar(255, 0, 0), thickness_2);
+
+			cv::putText(img2, to_string(i), rotatedDeslocatedFeaturePoint, CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+
+			imshow("Face with no rotation", img2);
+		}
+
 	}
 
 	imshow("LandMarks Vector", img);
+}
+
+Point2i rotate_point(Point2i center, Point2i p, float angle)
+{
+	float s = sin(angle);
+	float c = cos(angle);
+
+	// translate point back to origin:
+	p.x -= center.x;
+	p.y -= center.y;
+
+	// rotate point
+	float xnew = p.x * c - p.y * s;
+	float ynew = p.x * s + p.y * c;
+
+	// translate point back:
+	p.x = xnew + center.x;
+	p.y = ynew + center.y;
+	return p;
 }
