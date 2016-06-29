@@ -58,9 +58,12 @@
 
 enum EEmotion{
 	UNKNOWN = 0,
-	HAPPY = 1,
-	SAD = 2,
-	NORMAL = 3
+	NEUTRAL = 1,
+	HAPPY = 2,
+	SAD = 3,
+	ANGRY = 4,
+	SURPRISED = 5,
+	SCARED = 6
 };
 
 struct eye_struct{
@@ -95,12 +98,15 @@ std::cout << "Warning: " << stream << std::endl
 #define ERROR_STREAM( stream ) \
 std::cout << "Error: " << stream << std::endl
 
+
 void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks);
 vector<Point2i> getNormalizedLandMarks(Mat capturedImage, vector<Point2i> landMarks);
 Point2i rotate_point(Point2i center, Point2i p, float angle);
 Point2i scale_point(Point2i center, Point2i p, float scale);
 
 face_struct		getFeatureFace(vector<Point2i> landMarks);
+
+vector<Point2i> extractLandMarks(vector<Point2i> landMarks, int index_start, int index_end);
 
 vector<Point2i> getLeftEye(vector<Point2i> landMarks);
 vector<Point2i> getRightEye(vector<Point2i> landMarks);
@@ -111,6 +117,8 @@ vector<Point2i> getMouth(vector<Point2i> landMarks);
 eye_struct		getFeatureEye(vector<Point2i> eyeLandmarks);
 eyebrow_struct	getFeatureEyebrow(vector<Point2i> eyebrowLandmarks);
 mouth_struct	getFeatureMouth(vector<Point2i> mouthLandmarks);
+
+double distanceLineToPoint(vector<Point2i> line, Point2i point);
 
 double getHeightEye(vector<Point2i> eyeLandmarks);
 double getHeightEyebrow(vector<Point2i> eyebrowLandmarks);
@@ -123,10 +131,29 @@ double getEyeDistance(eye_struct actualEye, eye_struct baseEye);
 double getEyebrowDistance(eyebrow_struct actualEyebrow, eyebrow_struct baseEyebrow);
 double getMouthDistance(mouth_struct actualMouth, mouth_struct baseMouth);
 
-static void printErrorAndAbort( const std::string & error )
+vector<double> featureSnapshot(face_struct currentFace);
+
+void populateFaces();
+void exportFaces();
+
+void inputFace(face_struct currentFace, EEmotion emotion);
+
+//FOR INPUTTING FACES ONLY
+// i -> Activate input mode
+// a -> Add said face with the emotion of choice
+// s -> Next emotion
+bool inputMode = false;
+face_struct newFace = face_struct{};
+EEmotion emotionList[6] = { HAPPY, SAD, ANGRY, SURPRISED, SCARED, NEUTRAL };
+int choiceEmotion = 0;
+
+
+vector<face_struct> facePopulation;
+
+static void printErrorAndAbort(const std::string & error)
 {
-    std::cout << error << std::endl;
-    abort();
+	std::cout << error << std::endl;
+	abort();
 }
 
 #define FATAL_STREAM( stream ) \
@@ -140,7 +167,7 @@ vector<string> get_arguments(int argc, char **argv)
 
 	vector<string> arguments;
 
-	for(int i = 0; i < argc; ++i)
+	for (int i = 0; i < argc; ++i)
 	{
 		arguments.push_back(string(argv[i]));
 	}
@@ -178,9 +205,9 @@ void visualise_tracking(Mat& captured_image, Mat_<float>& depth_image, const CLM
 			Vec6d pose_estimate_to_draw;
 			// A rough heuristic for box around the face width
 			int thickness = (int)std::ceil(2.0* ((double)captured_image.cols) / 640.0);
-	
+
 			pose_estimate_to_draw = CLMTracker::GetCorrectedPoseWorld(clm_model, fx, fy, cx, cy);
-	
+
 			// Draw it in reddish if uncertain, blueish if certain
 			CLMTracker::DrawBox(captured_image, pose_estimate_to_draw, Scalar((1 - vis_certainty)*255.0, 0, vis_certainty * 255), thickness, fx, fy, cx, cy);
 		}
@@ -216,14 +243,16 @@ void visualise_tracking(Mat& captured_image, Mat_<float>& depth_image, const CLM
 	}
 }
 
-int main (int argc, char **argv)
+int main(int argc, char **argv)
 {
+	//Populate Faces
+	populateFaces();
 
 	vector<string> arguments = get_arguments(argc, argv);
 
 	// Some initial parameters that can be overriden from command line	
 	vector<string> files, depth_directories, pose_output_files, tracked_videos_output, landmark_output_files, landmark_3D_output_files;
-	
+
 	// By default try webcam 0
 	int device = 0;
 
@@ -232,13 +261,13 @@ int main (int argc, char **argv)
 	CLMTracker::CLMParameters clm_parameters(arguments);
 
 	// Get the input output file parameters
-	
+
 	// Indicates that rotation should be with respect to world or camera coordinates
 	bool use_world_coordinates;
 	CLMTracker::get_video_input_output_params(files, depth_directories, pose_output_files, tracked_videos_output, landmark_output_files, landmark_3D_output_files, use_world_coordinates, arguments);
-	
+
 	// The modules that are being used for tracking
-	CLMTracker::CLM clm_model(clm_parameters.model_location);	
+	CLMTracker::CLM clm_model(clm_parameters.model_location);
 
 	// Grab camera parameters, if they are not defined (approximate values will be used)
 	float fx = 0, fy = 0, cx = 0, cy = 0;
@@ -258,19 +287,19 @@ int main (int argc, char **argv)
 	}
 
 	// If multiple video files are tracked, use this to indicate if we are done
-	bool done = false;	
+	bool done = false;
 	int f_n = -1;
 
-	while(!done) // this is not a for loop as we might also be reading from a webcam
+	while (!done) // this is not a for loop as we might also be reading from a webcam
 	{
-		
+
 		string current_file;
 
 		// We might specify multiple video files as arguments
-		if(files.size() > 0)
+		if (files.size() > 0)
 		{
-			f_n++;			
-		    current_file = files[f_n];
+			f_n++;
+			current_file = files[f_n];
 		}
 		else
 		{
@@ -280,7 +309,7 @@ int main (int argc, char **argv)
 
 		double fps_vid_in = -1.0;
 
-		bool use_depth = !depth_directories.empty();	
+		bool use_depth = !depth_directories.empty();
 
 		// Do some grabbing
 		VideoCapture video_capture;
@@ -293,12 +322,13 @@ int main (int argc, char **argv)
 			// Read a first frame often empty in camera
 			Mat captured_image;
 			video_capture >> captured_image;
-		}else if( current_file.size() > 0 )
+		}
+		else if (current_file.size() > 0)
 		{
-			INFO_STREAM( "Attempting to read from file: " << current_file );
-			video_capture = VideoCapture( current_file );
+			INFO_STREAM("Attempting to read from file: " << current_file);
+			video_capture = VideoCapture(current_file);
 			fps_vid_in = video_capture.get(CV_CAP_PROP_FPS);
-			
+
 			// Check if fps is nan or less than 0
 			if (fps_vid_in != fps_vid_in || fps_vid_in <= 0)
 			{
@@ -307,11 +337,11 @@ int main (int argc, char **argv)
 			}
 		}
 
-		if( !video_capture.isOpened() ) FATAL_STREAM( "Failed to open video source" );
-		else INFO_STREAM( "Device or file opened");
+		if (!video_capture.isOpened()) FATAL_STREAM("Failed to open video source");
+		else INFO_STREAM("Device or file opened");
 
 		Mat captured_image;
-		video_capture >> captured_image;		
+		video_capture >> captured_image;
 
 		// If optical centers are not defined just use center of image
 		if (cx_undefined)
@@ -331,15 +361,15 @@ int main (int argc, char **argv)
 
 		// Creating output files
 		std::ofstream pose_output_file;
-		if(!pose_output_files.empty())
+		if (!pose_output_files.empty())
 		{
-			pose_output_file.open (pose_output_files[f_n], ios_base::out);
+			pose_output_file.open(pose_output_files[f_n], ios_base::out);
 			pose_output_file << "frame, timestamp, confidence, success, Tx, Ty, Tz, Rx, Ry, Rz";
 			pose_output_file << endl;
 		}
-	
-		std::ofstream landmarks_output_file;		
-		if(!landmark_output_files.empty())
+
+		std::ofstream landmarks_output_file;
+		if (!landmark_output_files.empty())
 		{
 			landmarks_output_file.open(landmark_output_files[f_n], ios_base::out);
 			landmarks_output_file << "frame, timestamp, confidence, success";
@@ -353,7 +383,7 @@ int main (int argc, char **argv)
 		}
 
 		std::ofstream landmarks_3D_output_file;
-		if(!landmark_3D_output_files.empty())
+		if (!landmark_3D_output_files.empty())
 		{
 			landmarks_3D_output_file.open(landmark_3D_output_files[f_n], ios_base::out);
 
@@ -369,12 +399,12 @@ int main (int argc, char **argv)
 
 			landmarks_3D_output_file << endl;
 		}
-	
+
 		int frame_count = 0;
-		
+
 		// saving the videos
 		VideoWriter writerFace;
-		if(!tracked_videos_output.empty())
+		if (!tracked_videos_output.empty())
 		{
 			double fps = fps_vid_in == -1 ? 30 : fps_vid_in;
 			writerFace = VideoWriter(tracked_videos_output[f_n], CV_FOURCC('D', 'I', 'V', 'X'), fps, captured_image.size(), true);
@@ -385,10 +415,10 @@ int main (int argc, char **argv)
 
 		// Timestamp in seconds of current processing
 		double time_stamp = 0;
-		
-		INFO_STREAM( "Starting tracking");
-		while(!captured_image.empty())
-		{		
+
+		INFO_STREAM("Starting tracking");
+		while (!captured_image.empty())
+		{
 
 			// Grab the timestamp first
 			if (fps_vid_in == -1)
@@ -396,7 +426,7 @@ int main (int argc, char **argv)
 				int64 curr_time = cv::getTickCount();
 				time_stamp = (double(curr_time - t_initial) / cv::getTickFrequency());
 			}
-			else 
+			else
 			{
 				time_stamp = (double)frame_count * (1.0 / fps_vid_in);
 			}
@@ -405,17 +435,17 @@ int main (int argc, char **argv)
 			Mat_<float> depth_image;
 			Mat_<uchar> grayscale_image;
 
-			if(captured_image.channels() == 3)
+			if (captured_image.channels() == 3)
 			{
-				cvtColor(captured_image, grayscale_image, CV_BGR2GRAY);				
+				cvtColor(captured_image, grayscale_image, CV_BGR2GRAY);
 			}
 			else
 			{
-				grayscale_image = captured_image.clone();				
+				grayscale_image = captured_image.clone();
 			}
-		
+
 			// Get depth image
-			if(use_depth)
+			if (use_depth)
 			{
 				char* dst = new char[100];
 				std::stringstream sstream;
@@ -426,23 +456,23 @@ int main (int argc, char **argv)
 				Mat_<short> depth_image_16_bit = imread(string(dst), -1);
 
 				// Convert to a floating point depth image
-				if(!depth_image_16_bit.empty())
+				if (!depth_image_16_bit.empty())
 				{
 					depth_image_16_bit.convertTo(depth_image, CV_32F);
 				}
 				else
 				{
-					WARN_STREAM( "Can't find depth image" );
+					WARN_STREAM("Can't find depth image");
 				}
 			}
-			
+
 			// The actual facial landmark detection / tracking
 			bool detection_success = CLMTracker::DetectLandmarksInVideo(grayscale_image, depth_image, clm_model, clm_parameters);
 
 			// Work out the pose of the head from the tracked model
 			Vec6d pose_estimate_CLM;
 			if (CALCULATE_POSE){
-				if(use_world_coordinates)
+				if (use_world_coordinates)
 				{
 					pose_estimate_CLM = CLMTracker::GetCorrectedPoseWorld(clm_model, fx, fy, cx, cy);
 				}
@@ -461,11 +491,11 @@ int main (int argc, char **argv)
 			actualLandmarks.clear();
 
 			// Output the detected facial landmarks
-			if(!landmark_output_files.empty())
+			if (!landmark_output_files.empty())
 			{
 				double confidence = 0.5 * (1 - clm_model.detection_certainty);
 				landmarks_output_file << frame_count + 1 << ", " << time_stamp << ", " << confidence << ", " << detection_success;
-				for (int i = 0; i < clm_model.pdm.NumberOfPoints() * 2; ++ i)
+				for (int i = 0; i < clm_model.pdm.NumberOfPoints() * 2; ++i)
 				{
 					landmarks_output_file << ", " << clm_model.detected_landmarks.at<double>(i);
 				}
@@ -473,7 +503,7 @@ int main (int argc, char **argv)
 			}
 
 			// Output the detected facial landmarks
-			if(!landmark_3D_output_files.empty())
+			if (!landmark_3D_output_files.empty())
 			{
 				double confidence = 0.5 * (1 - clm_model.detection_certainty);
 				landmarks_3D_output_file << frame_count + 1 << ", " << time_stamp << ", " << confidence << ", " << detection_success;
@@ -486,7 +516,7 @@ int main (int argc, char **argv)
 			}
 
 			// Output the estimated head pose
-			if(!pose_output_files.empty() && CALCULATE_POSE)
+			if (!pose_output_files.empty() && CALCULATE_POSE)
 			{
 				double confidence = 0.5 * (1 - clm_model.detection_certainty);
 				pose_output_file << frame_count + 1 << ", " << time_stamp << ", " << confidence << ", " << detection_success
@@ -495,32 +525,59 @@ int main (int argc, char **argv)
 			}
 
 			// output the tracked video
-			if(!tracked_videos_output.empty())
-			{		
+			if (!tracked_videos_output.empty())
+			{
 				writerFace << captured_image;
 			}
 
 			video_capture >> captured_image;
-		
+
 			// detect key presses
 			char character_press = cv::waitKey(1);
-			
+
 			// restart the tracker
-			if(character_press == 'r')
+			if (character_press == 'r')
 			{
 				clm_model.Reset();
 			}
 			// quit the application
-			else if(character_press=='q')
+			else if (character_press == 'q')
 			{
 				return(0);
 			}
-
+			else if (character_press == 'i')
+			{
+				if (inputMode)
+				{
+					inputMode = false;
+				}
+				else{
+					inputMode = true;
+				}
+			}
+			else if (character_press == 'a' && inputMode)
+			{
+				inputFace(newFace, emotionList[choiceEmotion]);
+			}
+			else if (character_press == 's' && inputMode)
+			{
+				if (choiceEmotion != 5)
+				{
+					choiceEmotion++;
+				}
+				else{
+					choiceEmotion = 0;
+				}
+			}
+			else if (character_press = 'd' && inputMode)
+			{
+				exportFaces();
+			}
 			// Update the frame count
 			frame_count++;
 
 		}
-		
+
 		frame_count = 0;
 
 		// Reset the model, for the next video
@@ -530,7 +587,7 @@ int main (int argc, char **argv)
 		landmarks_output_file.close();
 
 		// break out of the loop if done with all the files (or using a webcam)
-		if(f_n == files.size() -1 || files.empty())
+		if (f_n == files.size() - 1 || files.empty())
 		{
 			done = true;
 		}
@@ -616,9 +673,56 @@ void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks){
 
 	//		imshow("Face with no rotation", img2);
 	//	}
-		getNormalizedLandMarks(capturedImage, landMarks);
+	vector<Point2i> normalizedLandMarks = getNormalizedLandMarks(capturedImage, landMarks);
 
 	//}
+
+	if (!landMarks.empty()){
+		face_struct actualFace = getFeatureFace(normalizedLandMarks);
+
+
+		//DEBUG PURPOSES
+		int initY = 130;
+		int dist = 20;
+
+		vector<double> distances = featureSnapshot(actualFace);
+
+		cv::putText(img, "Left Eye H.: " + to_string(distances[0]), Point2i(20, initY + 1 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+		cv::putText(img, "Right Eye H.: " + to_string(distances[1]), Point2i(20, initY + 2 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+		cv::putText(img, "Left Eyebrow H.: " + to_string(distances[2]), Point2i(20, initY + 3 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+		cv::putText(img, "Right Eyebrow H.: " + to_string(distances[3]), Point2i(20, initY + 4 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+		cv::putText(img, "Mouth H.: " + to_string(distances[4]), Point2i(20, initY + 5 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+
+		EEmotion perceivedEmotion = getEmotion(actualFace);
+		string emotionString;
+		switch (perceivedEmotion){
+		case SAD:
+			emotionString = "SAD"; break;
+		case HAPPY:
+			emotionString = "HAPPY"; break;
+		case ANGRY:
+			emotionString = "ANGRY"; break;
+		case SURPRISED:
+			emotionString = "SURPRISED"; break;
+		case SCARED:
+			emotionString = "SCARED"; break;
+		case NEUTRAL:
+			emotionString = "NEUTRAL"; break;
+		default:
+			emotionString = "UNKNOWN";
+		}
+
+		cv::putText(img, "EMOTION: " + emotionString, Point2i(300, initY), CV_FONT_NORMAL, 0.8, Scalar(0, 0, 255), 1.5f);
+
+		if (inputMode)
+		{
+			newFace = actualFace;
+			cv::putText(img, "INPUT MODE", Point2i(20, 300), CV_FONT_NORMAL, 0.6, Scalar(255, 0, 255));
+			cv::putText(img, "Inputing Face as emotion: " + to_string(choiceEmotion), Point2i(20, 320), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
+			cv::putText(img, "0-HAPPY|1-SAD|2-ANGRY|3-SURPRISED|4-SCARED|5-NEUTRAL", Point2i(20, 340), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
+			cv::putText(img, "a - Adds current face. s - Cycle through emotions d - Export faces", Point2i(20, 360), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
+		}
+	}
 
 	imshow("LandMarks Vector", img);
 }
@@ -666,7 +770,7 @@ vector<Point2i> getNormalizedLandMarks(Mat capturedImage, vector<Point2i> landMa
 		cv::putText(img2, line3, Point(0, firstLineY + 3 * linePxSize), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 		cv::putText(img2, line4, Point(0, firstLineY + 4 * linePxSize), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 		cv::putText(img2, line5, Point(0, firstLineY + 5 * linePxSize), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		
+
 		//nariz = 33
 		Point2i featurePoint, normalizedFeaturePoint;
 		int deslocationX = (capturedImage.cols / 2) - landMarks[33].x;
@@ -701,6 +805,8 @@ vector<Point2i> getNormalizedLandMarks(Mat capturedImage, vector<Point2i> landMa
 			cv::putText(img2, to_string(i), normalizedFeaturePoint, CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
 
 			imshow("Normalized Face", img2);
+
+
 		}
 	}
 
@@ -739,4 +845,275 @@ Point2i scale_point(Point2i center, Point2i p, float scale){
 	p.x = xnew + center.x;
 	p.y = ynew + center.y;
 	return p;
+}
+
+face_struct	getFeatureFace(vector<Point2i> landMarks){
+
+
+	vector<Point2i> leftEyeLandmarks = getLeftEye(landMarks);
+	vector<Point2i> rightEyeLandmarks = getRightEye(landMarks);
+	vector<Point2i> leftEyebrowLandmarks = getLeftEyebrow(landMarks);
+	vector<Point2i> rightEyebrowLandmarks = getRightEyebrow(landMarks);
+	vector<Point2i> mouthLandmarks = getMouth(landMarks);
+
+	eye_struct		leftEyeStruct = getFeatureEye(leftEyeLandmarks);
+	eye_struct		rightEyeStruct = getFeatureEye(rightEyeLandmarks);
+	eyebrow_struct	leftEyebrowStruct = getFeatureEyebrow(leftEyebrowLandmarks);
+	eyebrow_struct	rightEyebrowStruct = getFeatureEyebrow(rightEyebrowLandmarks);
+	mouth_struct	mouthStruct = getFeatureMouth(mouthLandmarks);
+
+	face_struct currentFace =
+	{
+		leftEyeStruct,
+		rightEyeStruct,
+		leftEyebrowStruct,
+		rightEyebrowStruct,
+		mouthStruct,
+		UNKNOWN
+	};
+
+	return currentFace;
+}
+
+vector<Point2i> extractLandMarks(vector<Point2i> landMarks, int index_start, int index_end){
+	vector<Point2i> extractedLandmarks;
+
+	for (int i = index_start; i <= index_end; i++)
+	{
+		extractedLandmarks.push_back(landMarks[i]);
+	}
+
+	return extractedLandmarks;
+}
+
+vector<Point2i> getLeftEye(vector<Point2i> landMarks){
+	vector<Point2i> leftEyeLandMarks = extractLandMarks(landMarks, 36, 41);
+	return leftEyeLandMarks;
+}
+
+vector<Point2i> getRightEye(vector<Point2i> landMarks){
+	vector<Point2i> rightEyeLandMarks = extractLandMarks(landMarks, 42, 47);
+	return rightEyeLandMarks;
+}
+
+vector<Point2i> getLeftEyebrow(vector<Point2i> landMarks){
+	vector<Point2i> leftEyebrowLandMarks = extractLandMarks(landMarks, 17, 21);
+	return leftEyebrowLandMarks;
+}
+
+vector<Point2i> getRightEyebrow(vector<Point2i> landMarks){
+	vector<Point2i> rightEyebrowLandMarks = extractLandMarks(landMarks, 22, 26);
+	return rightEyebrowLandMarks;
+}
+
+vector<Point2i> getMouth(vector<Point2i> landMarks){
+	vector<Point2i> mouthLandMarks = extractLandMarks(landMarks, 48, 67);
+	return mouthLandMarks;
+}
+
+eye_struct		getFeatureEye(vector<Point2i> eyeLandmarks){
+	eye_struct eyeStruct = { getHeightEye(eyeLandmarks) };
+	return eyeStruct;
+}
+
+eyebrow_struct	getFeatureEyebrow(vector<Point2i> eyebrowLandmarks){
+	eyebrow_struct eyebrowStruct = { getHeightEyebrow(eyebrowLandmarks) };
+	return eyebrowStruct;
+}
+
+mouth_struct	getFeatureMouth(vector<Point2i> mouthLandmarks){
+	mouth_struct mouthStruct = { getHeightMouth(mouthLandmarks) };
+	return mouthStruct;
+}
+
+double distanceLineToPoint(vector<Point2i> line, Point2i point){
+	if (line.size() != 2) return -1;
+	double denom = abs(
+		(line[1].y - line[0].y)*point.x -
+		(line[1].x - line[0].x)*point.y +
+		line[1].x*line[0].y -
+		line[1].y*line[0].x);
+	double divis = sqrt(pow(line[1].y - line[0].y, 2) + pow(line[1].x - line[0].x, 2));
+	return denom / divis;
+}
+
+double getHeightEye(vector<Point2i> eyeLandmarks){
+
+	//Obtain midway point from the twin on both eyelids, then find the distance between them.
+	//Note that on both eyes, the point 1 2 and 4 5 are the eyelid ones, while the point 0 and 3 are the corners.
+
+	Point2i topEyelid =
+	{
+		((eyeLandmarks[1].x) + (eyeLandmarks[2].x)) / 2,
+		((eyeLandmarks[1].y) + (eyeLandmarks[2].y)) / 2
+	};
+
+	Point2i bottomEyelid =
+	{
+		((eyeLandmarks[4].x) + (eyeLandmarks[5].x)) / 2,
+		((eyeLandmarks[4].y) + (eyeLandmarks[5].y)) / 2
+	};
+
+	return cv::norm(topEyelid - bottomEyelid);
+}
+
+double getHeightEyebrow(vector<Point2i> eyebrowLandmarks)
+{
+	//Obtain midway point from the start and end of the eyebrow, then find the distance of them to the normally highest point of the eyebrow.
+	//Peak would be 2, while edges would be 0 and 4, could be done with line as well.
+
+	Point2i centerEyebrows =
+	{
+		((eyebrowLandmarks[0].x) + (eyebrowLandmarks[4].x)) / 2,
+		((eyebrowLandmarks[0].y) + (eyebrowLandmarks[4].y)) / 2
+	};
+
+	return cv::norm(eyebrowLandmarks[2] - centerEyebrows);
+}
+
+double getHeightMouth(vector<Point2i> mouthLandmarks){
+
+	//Finds the distance from the line of the edges of the mouth (48 & 54, or in the case of the extracted values, 0 and 6)
+	//and the lowest part of the mouth (57, or 9).
+
+	vector<Point2i> line;
+	line.push_back(mouthLandmarks[0]);
+	line.push_back(mouthLandmarks[6]);
+
+	return distanceLineToPoint(line, mouthLandmarks[9]);
+}
+
+EEmotion getEmotion(face_struct actualFace){
+
+	double low = 99999;
+	EEmotion foundEmotion = UNKNOWN;
+	for (int i = 0; i < facePopulation.size(); i++)
+	{
+		double distance = getDistance(actualFace, facePopulation[i]);
+		if (distance < low)
+		{
+			low = distance;
+			foundEmotion = facePopulation[i].emotion;
+		}
+	}
+
+	return foundEmotion;
+}
+
+double getDistance(face_struct actualFace, face_struct baseFace){
+
+	double distance = 0;
+
+	distance += getEyeDistance(actualFace.leftEye, baseFace.leftEye);
+	distance += getEyeDistance(actualFace.rightEye, baseFace.rightEye);
+	distance += getEyebrowDistance(actualFace.leftEyebrow, baseFace.leftEyebrow);
+	distance += getEyebrowDistance(actualFace.rightEyebrow, baseFace.rightEyebrow);
+	distance += getMouthDistance(actualFace.mouth, baseFace.mouth);
+
+	return distance;
+}
+
+double getEyeDistance(eye_struct actualEye, eye_struct baseEye)
+{
+	return abs(actualEye.eye_height - baseEye.eye_height);
+}
+
+double getEyebrowDistance(eyebrow_struct actualEyebrow, eyebrow_struct baseEyebrow)
+{
+	return abs(actualEyebrow.eyebrow_height - baseEyebrow.eyebrow_height);
+}
+
+double getMouthDistance(mouth_struct actualMouth, mouth_struct baseMouth)
+{
+	return abs(actualMouth.mouth_height - baseMouth.mouth_height);
+}
+
+vector<double> featureSnapshot(face_struct currentFace){
+	vector<double> features;
+
+	double leftEyeDistance = getEyeDistance(currentFace.leftEye, eye_struct{ 0 });
+	double rightEyeDistance = getEyeDistance(currentFace.rightEye, eye_struct{ 0 });
+	double leftEyebrowDistance = getEyebrowDistance(currentFace.leftEyebrow, eyebrow_struct{ 0 });
+	double rightEyebrowDistance = getEyebrowDistance(currentFace.rightEyebrow, eyebrow_struct{ 0 });
+	double mouthDistance = getMouthDistance(currentFace.mouth, mouth_struct{ 0 });
+
+	features.push_back(leftEyeDistance);
+	features.push_back(rightEyeDistance);
+	features.push_back(leftEyebrowDistance);
+	features.push_back(rightEyebrowDistance);
+	features.push_back(mouthDistance);
+
+	return features;
+}
+
+void populateFaces(){
+	ifstream facesDatabase("learningFaces.csv");
+
+	string input;
+	while (getline(facesDatabase, input))
+	{
+		double leftEyeHeight;
+		double rightEyeHeight;
+		double leftEyebrowHeight;
+		double rightEyebrowHeight;
+		double mouthHeight;
+		EEmotion emotion;
+
+		stringstream  lineStream(input);
+		string        cell;
+
+		std::getline(lineStream, cell, ',');
+		leftEyeHeight = stod(cell);
+		std::getline(lineStream, cell, ',');
+		rightEyeHeight = stod(cell);
+		std::getline(lineStream, cell, ',');
+		leftEyebrowHeight = stod(cell);
+		std::getline(lineStream, cell, ',');
+		rightEyebrowHeight = stod(cell);
+		std::getline(lineStream, cell, ',');
+		mouthHeight = stod(cell);
+		std::getline(lineStream, cell, ',');
+		if (cell == "SAD"){ emotion = SAD; }
+		else if (cell == "HAPPY"){ emotion = HAPPY; }
+		else if (cell == "ANGRY"){ emotion = ANGRY; }
+		else if (cell == "SURPRISED"){ emotion = SURPRISED; }
+		else if (cell == "SCARED"){ emotion = SCARED; }
+		else if (cell == "NEUTRAL"){ emotion = NEUTRAL; }
+
+		face_struct modelFace =
+		{
+			eye_struct{ leftEyeHeight },
+			eye_struct{ rightEyeHeight },
+			eyebrow_struct{ leftEyebrowHeight },
+			eyebrow_struct{ rightEyebrowHeight },
+			mouth_struct{ mouthHeight },
+			emotion
+		};
+
+		facePopulation.push_back(modelFace);
+	}
+}
+
+void exportFaces(){
+	ofstream facesDatabase;
+	facesDatabase.open("learningFaces.csv");
+	for (int i = 0; i < facePopulation.size(); i++)
+	{
+		string output =
+			to_string(facePopulation[i].leftEye.eye_height) + "," +
+			to_string(facePopulation[i].rightEye.eye_height) + "," +
+			to_string(facePopulation[i].leftEyebrow.eyebrow_height) + "," +
+			to_string(facePopulation[i].rightEyebrow.eyebrow_height) + "," +
+			to_string(facePopulation[i].mouth.mouth_height) + "," +
+			facePopulation[i].emotion;
+
+		facesDatabase << output;
+	};
+
+	facesDatabase.close();
+}
+
+void inputFace(face_struct currentFace, EEmotion emotion){
+	currentFace.emotion = emotion;
+	facePopulation.push_back(currentFace);
 }
