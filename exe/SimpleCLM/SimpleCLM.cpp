@@ -98,6 +98,7 @@ std::cout << "Warning: " << stream << std::endl
 #define ERROR_STREAM( stream ) \
 std::cout << "Error: " << stream << std::endl
 
+void init();
 
 void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks);
 vector<Point2i> getNormalizedLandMarks(Mat capturedImage, vector<Point2i> landMarks);
@@ -149,6 +150,21 @@ int choiceEmotion = 0;
 
 
 vector<face_struct> facePopulation;
+
+map<EEmotion, string> emotionMap;
+
+void init(){
+	emotionMap[EEmotion::UNKNOWN]	= "Unknown";
+	emotionMap[EEmotion::HAPPY]		= "Happy";
+	emotionMap[EEmotion::SAD]		= "Sad";
+	emotionMap[EEmotion::ANGRY]		= "Angry";
+	emotionMap[EEmotion::SURPRISED]	= "Surprised";
+	emotionMap[EEmotion::SCARED]	= "Scared";
+	emotionMap[EEmotion::NEUTRAL]	= "Neutral";
+
+	//Populate Faces
+	//populateFaces();
+}
 
 static void printErrorAndAbort(const std::string & error)
 {
@@ -245,8 +261,7 @@ void visualise_tracking(Mat& captured_image, Mat_<float>& depth_image, const CLM
 
 int main(int argc, char **argv)
 {
-	//Populate Faces
-	populateFaces();
+	init();
 
 	vector<string> arguments = get_arguments(argc, argv);
 
@@ -1057,7 +1072,7 @@ void populateFaces(){
 		double leftEyebrowHeight;
 		double rightEyebrowHeight;
 		double mouthHeight;
-		EEmotion emotion;
+		EEmotion emotion = UNKNOWN;
 
 		stringstream  lineStream(input);
 		string        cell;
@@ -1097,15 +1112,17 @@ void populateFaces(){
 void exportFaces(){
 	ofstream facesDatabase;
 	facesDatabase.open("learningFaces.csv");
+
+	facesDatabase << "Expression,Left Eye Height,Right Eye Height,Left Eyebrow Height,Right Eyebrow Height,MouthHeight,\n";
 	for (int i = 0; i < facePopulation.size(); i++)
 	{
 		string output =
+			emotionMap[facePopulation[i].emotion] + "," +
 			to_string(facePopulation[i].leftEye.eye_height) + "," +
 			to_string(facePopulation[i].rightEye.eye_height) + "," +
 			to_string(facePopulation[i].leftEyebrow.eyebrow_height) + "," +
 			to_string(facePopulation[i].rightEyebrow.eyebrow_height) + "," +
-			to_string(facePopulation[i].mouth.mouth_height) + "," +
-			facePopulation[i].emotion;
+			to_string(facePopulation[i].mouth.mouth_height) + ",\n";
 
 		facesDatabase << output;
 	};
