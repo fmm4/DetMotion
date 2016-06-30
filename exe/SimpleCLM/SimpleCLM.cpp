@@ -1132,47 +1132,67 @@ void populateFaces(){
 	getline(facesDatabase, input);
 	while (getline(facesDatabase, input))
 	{
-		double leftEyeHeight;
-		double rightEyeHeight;
-		double leftEyebrowHeight;
-		double rightEyebrowHeight;
-		double mouthHeight;
-		EEmotion emotion = UNKNOWN;
+		try{
 
-		stringstream  lineStream(input);
-		string        cell;
+			double leftEyeHeight;
+			double rightEyeHeight;
+			double leftEyebrowHeight;
+			double rightEyebrowHeight;
+			double leftEyebrow2eyeHeight;
+			double rightEyebrow2eyeHeight;
+			double mouthHeight;
+			EEmotion emotion = UNKNOWN;
 
-		std::getline(lineStream, cell, ',');
-		if (cell == "Sad"){ emotion = SAD; }
-		else if (cell == "Happy"){ emotion = HAPPY; }
-		else if (cell == "Angry"){ emotion = ANGRY; }
-		else if (cell == "Surprised"){ emotion = SURPRISED; }
-		else if (cell == "Scared"){ emotion = SCARED; }
-		else if (cell == "Neutral"){ emotion = NEUTRAL; }
-		std::getline(lineStream, cell, ',');
-		leftEyeHeight = stod(cell);
-		std::getline(lineStream, cell, ',');
-		rightEyeHeight = stod(cell);
-		std::getline(lineStream, cell, ',');
-		leftEyebrowHeight = stod(cell);
-		std::getline(lineStream, cell, ',');
-		rightEyebrowHeight = stod(cell);
-		std::getline(lineStream, cell, ',');
-		mouthHeight = stod(cell);
+			stringstream  lineStream(input);
+			string        cell;
 
+			std::getline(lineStream, cell, ',');
+			if (cell == emotionMap[EEmotion::SAD])			 { emotion = SAD; }
+			else if (cell == emotionMap[EEmotion::HAPPY])	 { emotion = HAPPY; }
+			else if (cell == emotionMap[EEmotion::ANGRY])	 { emotion = ANGRY; }
+			else if (cell == emotionMap[EEmotion::SURPRISED]){ emotion = SURPRISED; }
+			else if (cell == emotionMap[EEmotion::SCARED])	 { emotion = SCARED; }
+			else if (cell == emotionMap[EEmotion::NEUTRAL])	 { emotion = NEUTRAL; }
 
-		face_struct modelFace =
-		{
-			eye_struct{ leftEyeHeight },
-			eye_struct{ rightEyeHeight },
-			eyebrow_struct{ leftEyebrowHeight },
-			eyebrow_struct{ rightEyebrowHeight },
-			mouth_struct{ mouthHeight },
-			emotion
-		};
+			std::getline(lineStream, cell, ',');
+			leftEyeHeight = stod(cell);
+			
+			std::getline(lineStream, cell, ',');
+			rightEyeHeight = stod(cell);
+			
+			std::getline(lineStream, cell, ',');
+			leftEyebrowHeight = stod(cell);
+			
+			std::getline(lineStream, cell, ',');
+			rightEyebrowHeight = stod(cell);
+			
+			std::getline(lineStream, cell, ',');
+			rightEyebrow2eyeHeight = stod(cell);
+			
+			std::getline(lineStream, cell, ',');
+			rightEyebrow2eyeHeight = stod(cell);
+			
+			std::getline(lineStream, cell, ',');
+			mouthHeight = stod(cell);
 
-		facePopulation.push_back(modelFace);
+			face_struct modelFace =
+			{
+				eye_struct{ leftEyeHeight },
+				eye_struct{ rightEyeHeight },
+				eyebrow_struct{ leftEyebrowHeight, leftEyebrow2eyeHeight },
+				eyebrow_struct{ rightEyebrowHeight, rightEyebrow2eyeHeight },
+				mouth_struct{ mouthHeight },
+				emotion
+			};
 
+			facePopulation.push_back(modelFace);
+		}
+		catch (...){
+			facePopulation.clear();
+			cout << "Error During the Expression Learning Phase. Please Verify the Base and Restart the Algorithm!\n" <<
+				"This Session Will Be Started With No Previous Training, Please Calibrate the Algorithm Pressing I!" << endl;
+			break;
+		}
 	}
 }
 
@@ -1180,7 +1200,7 @@ void exportFaces(){
 	ofstream facesDatabase;
 	facesDatabase.open("learningFaces.csv");
 
-	facesDatabase << "Expression,Left Eye Height,Right Eye Height,Left Eyebrow Height,Right Eyebrow Height,MouthHeight,\n";
+	facesDatabase << "Expression,Left Eye Height,Right Eye Height,Left Eyebrow Height,Right Eyebrow Height,Left Eyebrow to Eye Height,Right Eyebrow to Eye Height,MouthHeight,\n";
 	for (int i = 0; i < facePopulation.size(); i++)
 	{
 		string output =
@@ -1189,6 +1209,8 @@ void exportFaces(){
 			to_string(facePopulation[i].rightEye.eye_height) + "," +
 			to_string(facePopulation[i].leftEyebrow.eyebrow_height) + "," +
 			to_string(facePopulation[i].rightEyebrow.eyebrow_height) + "," +
+			to_string(facePopulation[i].leftEyebrow.eyebrow2eye_height) + "," +
+			to_string(facePopulation[i].rightEyebrow.eyebrow2eye_height) + "," +
 			to_string(facePopulation[i].mouth.mouth_height) + ",\n";
 
 		facesDatabase << output;
@@ -1210,6 +1232,8 @@ void pushFaceToFile(face_struct currentFace)
 		to_string(currentFace.rightEye.eye_height) + "," +
 		to_string(currentFace.leftEyebrow.eyebrow_height) + "," +
 		to_string(currentFace.rightEyebrow.eyebrow_height) + "," +
+		to_string(currentFace.leftEyebrow.eyebrow2eye_height) + "," +
+		to_string(currentFace.rightEyebrow.eyebrow2eye_height) + "," +
 		to_string(currentFace.mouth.mouth_height) + "," +
 		getSessionTime() + ",\n";
 
