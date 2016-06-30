@@ -54,6 +54,7 @@
 #include <sstream>
 #include <ctime> // finding time
 #include <chrono> // time
+#include <algorithm> // min 
 
 #include <opencv2/videoio/videoio.hpp>  // Video write
 #include <opencv2/videoio/videoio_c.h>  // Video write
@@ -90,6 +91,9 @@ struct face_struct{
 
 #define PI 3.1415926535897
 #define CALCULATE_POSE false
+#define KNN 1 //1 - Usando KNN, 0 - Usando matriz dissimilaridade
+int neighbours = 10;
+
 vector<Point2i> actualLandmarks;
 
 #define INFO_STREAM( stream ) \
@@ -756,15 +760,23 @@ void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks){
 			distanceGambiarra[emotionMap[EEmotion::NEUTRAL]] +
 			distanceGambiarra[emotionMap[EEmotion::UNKNOWN]];
 
-
-		cv::putText(img, "Happy:     " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::HAPPY]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 6 * dist),  CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Sad:       " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SAD]]		 *100/totalDistance)) + "%"	, Point2i(20, initY + 7 * dist),  CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Surprised: " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SURPRISED]] *100/totalDistance)) + "%"	, Point2i(20, initY + 8 * dist),  CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Angry:     " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::ANGRY]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 9 * dist),  CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Scared:    " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SCARED]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 10 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Neutral:   " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::NEUTRAL]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 11 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+#if KNN
+		cv::putText(img, "Happy:     " + to_string(roundf((double)distanceGambiarra[emotionMap[EEmotion::HAPPY]])) + "%", Point2i(20, initY + 6 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Sad:       " + to_string(roundf((double)distanceGambiarra[emotionMap[EEmotion::SAD]])) + "%", Point2i(20, initY + 7 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Surprised: " + to_string(roundf(distanceGambiarra[emotionMap[EEmotion::SURPRISED]])) + "%", Point2i(20, initY + 8 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Angry:     " + to_string(roundf(distanceGambiarra[emotionMap[EEmotion::ANGRY]])) + "%", Point2i(20, initY + 9 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Scared:    " + to_string(roundf(distanceGambiarra[emotionMap[EEmotion::SCARED]])) + "%", Point2i(20, initY + 10 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Neutral:   " + to_string(roundf(distanceGambiarra[emotionMap[EEmotion::NEUTRAL]])) + "%", Point2i(20, initY + 11 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+#else
+		cv::putText(img, "Happy:     " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::HAPPY]] * 100 / totalDistance)) + "%", Point2i(20, initY + 6 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Sad:       " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SAD]] * 100 / totalDistance)) + "%", Point2i(20, initY + 7 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Surprised: " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SURPRISED]] * 100 / totalDistance)) + "%", Point2i(20, initY + 8 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Angry:     " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::ANGRY]] * 100 / totalDistance)) + "%", Point2i(20, initY + 9 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Scared:    " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SCARED]] * 100 / totalDistance)) + "%", Point2i(20, initY + 10 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Neutral:   " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::NEUTRAL]] * 100 / totalDistance)) + "%", Point2i(20, initY + 11 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 		//cv::putText(img, "Unknown:   " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::UNKNOWN]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 12 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-
+		
+#endif
 		cv::putText(img, "EMOTION: " + emotionMap[actualFace.emotion], Point2i(300, initY), CV_FONT_NORMAL, 0.8, Scalar(0, 0, 255), 1.5f);
 
 		if (inputMode)
@@ -1060,7 +1072,42 @@ double getHeightMouth(vector<Point2i> mouthLandmarks){
 }
 
 EEmotion getEmotion(face_struct actualFace){
+#if KNN
+	double low = 0;
+	vector<pair<double, EEmotion> > distances;
+	EEmotion foundEmotion = UNKNOWN;
+	for (int i = 0; i < facePopulation.size(); i++)
+	{
+		double distance = getDistance(actualFace, facePopulation[i]);
 
+		distances.push_back(make_pair(distance, facePopulation[i].emotion));
+	}
+
+	sort(distances.begin(), distances.end());
+
+	map<EEmotion, int> neighboursVotes;
+
+	for (int i = 0; i <= neighbours && i<facePopulation.size(); i++)
+	{
+		neighboursVotes[distances[i].second] += 1;
+	}
+
+	double nrOfVotes = min(neighbours, (int)facePopulation.size());
+
+
+	for (map<EEmotion, int>::iterator it = neighboursVotes.begin(); it != neighboursVotes.end(); ++it)
+	{
+		nrOfVotes += it->second;
+		distanceGambiarra[emotionMap[it->first]] = (it->second / nrOfVotes)*100;
+		if (low < it->second)
+		{
+			low = it->second;
+			foundEmotion = it->first;
+		}
+	}
+
+	return foundEmotion;
+#else
 	double low = 99999;
 	EEmotion foundEmotion = UNKNOWN;
 	for (int i = 0; i < facePopulation.size(); i++)
@@ -1077,6 +1124,8 @@ EEmotion getEmotion(face_struct actualFace){
 	}
 
 	return foundEmotion;
+#endif
+		
 }
 
 double getDistance(face_struct actualFace, face_struct baseFace){
@@ -1167,7 +1216,7 @@ void populateFaces(){
 			rightEyebrowHeight = stod(cell);
 			
 			std::getline(lineStream, cell, ',');
-			rightEyebrow2eyeHeight = stod(cell);
+			leftEyebrow2eyeHeight = stod(cell);
 			
 			std::getline(lineStream, cell, ',');
 			rightEyebrow2eyeHeight = stod(cell);
