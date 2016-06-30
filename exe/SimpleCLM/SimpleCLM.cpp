@@ -74,6 +74,7 @@ struct eye_struct{
 
 struct eyebrow_struct{
 	double eyebrow_height;
+	double eyebrow2eye_height;
 };
 
 struct mouth_struct{
@@ -118,7 +119,7 @@ vector<Point2i> getRightEyebrow(vector<Point2i> landMarks);
 vector<Point2i> getMouth(vector<Point2i> landMarks);
 
 eye_struct		getFeatureEye(vector<Point2i> eyeLandmarks);
-eyebrow_struct	getFeatureEyebrow(vector<Point2i> eyebrowLandmarks);
+eyebrow_struct	getFeatureEyebrow(vector<Point2i> eyebrowLandmarks, vector<Point2i> eyeLandmarks);
 mouth_struct	getFeatureMouth(vector<Point2i> mouthLandmarks);
 
 double distanceLineToPoint(vector<Point2i> line, Point2i point);
@@ -126,6 +127,7 @@ double distanceLineToPoint(vector<Point2i> line, Point2i point);
 double getHeightEye(vector<Point2i> eyeLandmarks);
 double getHeightEyebrow(vector<Point2i> eyebrowLandmarks);
 double getHeightMouth(vector<Point2i> mouthLandmarks);
+double getHeightEyebrow2Eye(vector<Point2i> eyeLandmarks, vector<Point2i> eyebrowLandmarks);
 
 EEmotion getEmotion(face_struct actualFace);
 double getDistance(face_struct actualFace, face_struct baseFace);
@@ -922,8 +924,8 @@ face_struct	getFeatureFace(vector<Point2i> landMarks){
 
 	eye_struct		leftEyeStruct = getFeatureEye(leftEyeLandmarks);
 	eye_struct		rightEyeStruct = getFeatureEye(rightEyeLandmarks);
-	eyebrow_struct	leftEyebrowStruct = getFeatureEyebrow(leftEyebrowLandmarks);
-	eyebrow_struct	rightEyebrowStruct = getFeatureEyebrow(rightEyebrowLandmarks);
+	eyebrow_struct	leftEyebrowStruct = getFeatureEyebrow(leftEyebrowLandmarks, leftEyeLandmarks);
+	eyebrow_struct	rightEyebrowStruct = getFeatureEyebrow(rightEyebrowLandmarks, leftEyeLandmarks);
 	mouth_struct	mouthStruct = getFeatureMouth(mouthLandmarks);
 
 	face_struct currentFace =
@@ -980,8 +982,8 @@ eye_struct		getFeatureEye(vector<Point2i> eyeLandmarks){
 	return eyeStruct;
 }
 
-eyebrow_struct	getFeatureEyebrow(vector<Point2i> eyebrowLandmarks){
-	eyebrow_struct eyebrowStruct = { getHeightEyebrow(eyebrowLandmarks) };
+eyebrow_struct	getFeatureEyebrow(vector<Point2i> eyebrowLandmarks, vector<Point2i> eyeLandmarks){
+	eyebrow_struct eyebrowStruct = { getHeightEyebrow(eyebrowLandmarks), getHeightEyebrow2Eye(eyebrowLandmarks, eyeLandmarks) };
 	return eyebrowStruct;
 }
 
@@ -1033,6 +1035,16 @@ double getHeightEyebrow(vector<Point2i> eyebrowLandmarks)
 	};
 
 	return cv::norm(eyebrowLandmarks[2] - centerEyebrows);
+}
+
+double getHeightEyebrow2Eye(vector<Point2i> eyeLandmarks, vector<Point2i> eyebrowLandmarks){
+	Point2i topEyelid =
+	{
+		((eyeLandmarks[1].x) + (eyeLandmarks[2].x)) / 2,
+		((eyeLandmarks[1].y) + (eyeLandmarks[2].y)) / 2
+	};
+
+	return cv::norm(eyebrowLandmarks[2] - topEyelid);
 }
 
 double getHeightMouth(vector<Point2i> mouthLandmarks){
@@ -1087,7 +1099,7 @@ double getEyeDistance(eye_struct actualEye, eye_struct baseEye)
 
 double getEyebrowDistance(eyebrow_struct actualEyebrow, eyebrow_struct baseEyebrow)
 {
-	return abs(actualEyebrow.eyebrow_height - baseEyebrow.eyebrow_height);
+	return abs(actualEyebrow.eyebrow_height - baseEyebrow.eyebrow_height) + abs(actualEyebrow.eyebrow2eye_height - baseEyebrow.eyebrow2eye_height);
 }
 
 double getMouthDistance(mouth_struct actualMouth, mouth_struct baseMouth)
