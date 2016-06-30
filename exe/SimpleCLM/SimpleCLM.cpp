@@ -52,6 +52,8 @@
 
 #include <fstream>
 #include <sstream>
+#include <ctime> // finding time
+#include <chrono> // time
 
 #include <opencv2/videoio/videoio.hpp>  // Video write
 #include <opencv2/videoio/videoio_c.h>  // Video write
@@ -127,6 +129,7 @@ double getHeightMouth(vector<Point2i> mouthLandmarks);
 
 EEmotion getEmotion(face_struct actualFace);
 double getDistance(face_struct actualFace, face_struct baseFace);
+map<string, double> distanceGambiarra;
 
 double getEyeDistance(eye_struct actualEye, eye_struct baseEye);
 double getEyebrowDistance(eyebrow_struct actualEyebrow, eyebrow_struct baseEyebrow);
@@ -149,21 +152,34 @@ EEmotion emotionList[6] = { HAPPY, SAD, ANGRY, SURPRISED, SCARED, NEUTRAL };
 int choiceEmotion = 0;
 
 
+//CAPTURE MODE
+bool captureMode = false;
+time_t sessionTime;
+ofstream outputCSV;
+string getSessionName();
+string getSessionTime();
+clock_t captureStart;
+int captureRate = 1;
+int tickCount = 0;
+
+
+void pushFaceToFile(face_struct currentFace);
+
 vector<face_struct> facePopulation;
 
 map<EEmotion, string> emotionMap;
 
 void init(){
-	emotionMap[EEmotion::UNKNOWN]	= "Unknown";
-	emotionMap[EEmotion::HAPPY]		= "Happy";
-	emotionMap[EEmotion::SAD]		= "Sad";
-	emotionMap[EEmotion::ANGRY]		= "Angry";
-	emotionMap[EEmotion::SURPRISED]	= "Surprised";
-	emotionMap[EEmotion::SCARED]	= "Scared";
-	emotionMap[EEmotion::NEUTRAL]	= "Neutral";
+	emotionMap[EEmotion::UNKNOWN] = "Unknown";
+	emotionMap[EEmotion::HAPPY] = "Happy";
+	emotionMap[EEmotion::SAD] = "Sad";
+	emotionMap[EEmotion::ANGRY] = "Angry";
+	emotionMap[EEmotion::SURPRISED] = "Surprised";
+	emotionMap[EEmotion::SCARED] = "Scared";
+	emotionMap[EEmotion::NEUTRAL] = "Neutral";
 
 	//Populate Faces
-	//populateFaces();
+	populateFaces();
 }
 
 static void printErrorAndAbort(const std::string & error)
@@ -262,6 +278,8 @@ void visualise_tracking(Mat& captured_image, Mat_<float>& depth_image, const CLM
 int main(int argc, char **argv)
 {
 	init();
+
+
 
 	vector<string> arguments = get_arguments(argc, argv);
 
@@ -584,10 +602,27 @@ int main(int argc, char **argv)
 					choiceEmotion = 0;
 				}
 			}
-			else if (character_press = 'd' && inputMode)
+			else if (character_press == 'd' && inputMode)
 			{
 				exportFaces();
 			}
+			else if (character_press == 'c')
+			{
+				if (captureMode == true)
+				{
+					captureMode = false;
+					outputCSV.close();
+				}
+				else if (captureMode == false){
+					captureMode = true;
+					string sessionName = getSessionName();
+					captureStart = clock();
+					outputCSV.open(sessionName);
+					outputCSV << "Expression,Left Eye Height,Right Eye Height,Left Eyebrow Height,Right Eyebrow Height,MouthHeight,Timestamp\n";
+				}
+			}
+
+
 			// Update the frame count
 			frame_count++;
 
@@ -702,32 +737,33 @@ void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks){
 
 		vector<double> distances = featureSnapshot(actualFace);
 
-		cv::putText(img, "Left Eye H.: " + to_string(distances[0]), Point2i(20, initY + 1 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
-		cv::putText(img, "Right Eye H.: " + to_string(distances[1]), Point2i(20, initY + 2 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
-		cv::putText(img, "Left Eyebrow H.: " + to_string(distances[2]), Point2i(20, initY + 3 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
-		cv::putText(img, "Right Eyebrow H.: " + to_string(distances[3]), Point2i(20, initY + 4 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
-		cv::putText(img, "Mouth H.: " + to_string(distances[4]), Point2i(20, initY + 5 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+		cv::putText(img, "Left Eye H.: " + to_string(distances[0])		, Point2i(20, initY + 1 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+		cv::putText(img, "Right Eye H.: " + to_string(distances[1])		, Point2i(20, initY + 2 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+		cv::putText(img, "Left Eyebrow H.: " + to_string(distances[2])	, Point2i(20, initY + 3 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+		cv::putText(img, "Right Eyebrow H.: " + to_string(distances[3])	, Point2i(20, initY + 4 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
+		cv::putText(img, "Mouth H.: " + to_string(distances[4])			, Point2i(20, initY + 5 * dist), CV_FONT_NORMAL, 0.3, Scalar(0, 0, 255));
 
-		EEmotion perceivedEmotion = getEmotion(actualFace);
-		string emotionString;
-		switch (perceivedEmotion){
-		case SAD:
-			emotionString = "SAD"; break;
-		case HAPPY:
-			emotionString = "HAPPY"; break;
-		case ANGRY:
-			emotionString = "ANGRY"; break;
-		case SURPRISED:
-			emotionString = "SURPRISED"; break;
-		case SCARED:
-			emotionString = "SCARED"; break;
-		case NEUTRAL:
-			emotionString = "NEUTRAL"; break;
-		default:
-			emotionString = "UNKNOWN";
-		}
+		actualFace.emotion = getEmotion(actualFace);
 
-		cv::putText(img, "EMOTION: " + emotionString, Point2i(300, initY), CV_FONT_NORMAL, 0.8, Scalar(0, 0, 255), 1.5f);
+		double totalDistance =
+			distanceGambiarra[emotionMap[EEmotion::HAPPY]] +
+			distanceGambiarra[emotionMap[EEmotion::SAD]] +
+			distanceGambiarra[emotionMap[EEmotion::SURPRISED]] +
+			distanceGambiarra[emotionMap[EEmotion::ANGRY]] +
+			distanceGambiarra[emotionMap[EEmotion::SCARED]] +
+			distanceGambiarra[emotionMap[EEmotion::NEUTRAL]] +
+			distanceGambiarra[emotionMap[EEmotion::UNKNOWN]];
+
+
+		cv::putText(img, "Happy:     " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::HAPPY]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 6 * dist),  CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Sad:       " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SAD]]		 *100/totalDistance)) + "%"	, Point2i(20, initY + 7 * dist),  CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Surprised: " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SURPRISED]] *100/totalDistance)) + "%"	, Point2i(20, initY + 8 * dist),  CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Angry:     " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::ANGRY]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 9 * dist),  CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Scared:    " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SCARED]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 10 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Neutral:   " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::NEUTRAL]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 11 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		//cv::putText(img, "Unknown:   " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::UNKNOWN]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 12 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+
+		cv::putText(img, "EMOTION: " + emotionMap[actualFace.emotion], Point2i(300, initY), CV_FONT_NORMAL, 0.8, Scalar(0, 0, 255), 1.5f);
 
 		if (inputMode)
 		{
@@ -736,6 +772,19 @@ void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks){
 			cv::putText(img, "Inputing Face as emotion: " + to_string(choiceEmotion), Point2i(20, 320), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
 			cv::putText(img, "0-HAPPY|1-SAD|2-ANGRY|3-SURPRISED|4-SCARED|5-NEUTRAL", Point2i(20, 340), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
 			cv::putText(img, "a - Adds current face. s - Cycle through emotions d - Export faces", Point2i(20, 360), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
+		}
+
+		if (captureMode)
+		{
+			tickCount += 1;
+			cv::putText(img, "CAPTURE MODE ON", Point2i(10, 40), CV_FONT_NORMAL, 1.0, Scalar(125, 255, 125));
+			if (tickCount >= captureRate){
+				pushFaceToFile(actualFace);
+				tickCount = 0;
+			}
+		}
+		else{
+			cv::putText(img, "CAPTURE MODE OFF", Point2i(10, 40), CV_FONT_NORMAL, 1.0, Scalar(125, 125, 255));
 		}
 	}
 
@@ -1005,6 +1054,9 @@ EEmotion getEmotion(face_struct actualFace){
 	for (int i = 0; i < facePopulation.size(); i++)
 	{
 		double distance = getDistance(actualFace, facePopulation[i]);
+
+		distanceGambiarra[emotionMap[facePopulation[i].emotion]] = distance;
+
 		if (distance < low)
 		{
 			low = distance;
@@ -1062,9 +1114,10 @@ vector<double> featureSnapshot(face_struct currentFace){
 }
 
 void populateFaces(){
-	ifstream facesDatabase("learningFaces.csv");
-
+	ifstream facesDatabase;
+	facesDatabase.open("learningFaces.csv");
 	string input;
+	getline(facesDatabase, input);
 	while (getline(facesDatabase, input))
 	{
 		double leftEyeHeight;
@@ -1078,6 +1131,13 @@ void populateFaces(){
 		string        cell;
 
 		std::getline(lineStream, cell, ',');
+		if (cell == "Sad"){ emotion = SAD; }
+		else if (cell == "Happy"){ emotion = HAPPY; }
+		else if (cell == "Angry"){ emotion = ANGRY; }
+		else if (cell == "Surprised"){ emotion = SURPRISED; }
+		else if (cell == "Scared"){ emotion = SCARED; }
+		else if (cell == "Neutral"){ emotion = NEUTRAL; }
+		std::getline(lineStream, cell, ',');
 		leftEyeHeight = stod(cell);
 		std::getline(lineStream, cell, ',');
 		rightEyeHeight = stod(cell);
@@ -1087,13 +1147,7 @@ void populateFaces(){
 		rightEyebrowHeight = stod(cell);
 		std::getline(lineStream, cell, ',');
 		mouthHeight = stod(cell);
-		std::getline(lineStream, cell, ',');
-		if (cell == "SAD"){ emotion = SAD; }
-		else if (cell == "HAPPY"){ emotion = HAPPY; }
-		else if (cell == "ANGRY"){ emotion = ANGRY; }
-		else if (cell == "SURPRISED"){ emotion = SURPRISED; }
-		else if (cell == "SCARED"){ emotion = SCARED; }
-		else if (cell == "NEUTRAL"){ emotion = NEUTRAL; }
+
 
 		face_struct modelFace =
 		{
@@ -1106,6 +1160,7 @@ void populateFaces(){
 		};
 
 		facePopulation.push_back(modelFace);
+
 	}
 }
 
@@ -1133,4 +1188,45 @@ void exportFaces(){
 void inputFace(face_struct currentFace, EEmotion emotion){
 	currentFace.emotion = emotion;
 	facePopulation.push_back(currentFace);
+}
+
+void pushFaceToFile(face_struct currentFace)
+{
+	string output =
+		emotionMap[currentFace.emotion] + "," +
+		to_string(currentFace.leftEye.eye_height) + "," +
+		to_string(currentFace.rightEye.eye_height) + "," +
+		to_string(currentFace.leftEyebrow.eyebrow_height) + "," +
+		to_string(currentFace.rightEyebrow.eyebrow_height) + "," +
+		to_string(currentFace.mouth.mouth_height) + "," +
+		getSessionTime() + ",\n";
+
+	outputCSV << output;
+}
+
+string getSessionName(){
+	struct tm *current;
+	time_t timenow;
+	time(&timenow);
+	sessionTime = timenow;
+	current = localtime(&timenow);
+	string sessionName = "Session-";
+	sessionName += to_string(current->tm_year + 1900) + "-";
+	sessionName += to_string(current->tm_mon + 1) + "-";
+	sessionName += to_string(current->tm_mday) + "-";
+	sessionName += to_string(current->tm_hour) + "-";
+	sessionName += to_string(current->tm_min) + "-";
+	sessionName += to_string(current->tm_sec) + ".csv";
+	return sessionName;
+}
+
+string getSessionTime()
+{
+	struct tm *current;
+	time_t timenow;
+	time(&timenow);
+	current = localtime(&timenow);
+	double sessionDifference = difftime(timenow, sessionTime);
+	string timePassed = to_string((clock() - captureStart) / (double)CLOCKS_PER_SEC) + "ms";
+	return timePassed;
 }
