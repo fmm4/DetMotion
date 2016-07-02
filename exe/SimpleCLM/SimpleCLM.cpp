@@ -624,7 +624,7 @@ int main(int argc, char **argv)
 					string sessionName = getSessionName();
 					captureStart = clock();
 					outputCSV.open(sessionName);
-					outputCSV << "Expression,Left Eye Height,Right Eye Height,Left Eyebrow Height,Right Eyebrow Height,MouthHeight,Timestamp\n";
+					outputCSV << "Expression,Left Eye Height,Right Eye Height,Left Eyebrow Height,Right Eyebrow Height,LeftEyebrow to Eye Distance,RightEyebrow to Eye Distance,MouthHeight,Timestamp\n";
 				}
 			}
 
@@ -937,7 +937,7 @@ face_struct	getFeatureFace(vector<Point2i> landMarks){
 	eye_struct		leftEyeStruct = getFeatureEye(leftEyeLandmarks);
 	eye_struct		rightEyeStruct = getFeatureEye(rightEyeLandmarks);
 	eyebrow_struct	leftEyebrowStruct = getFeatureEyebrow(leftEyebrowLandmarks, leftEyeLandmarks);
-	eyebrow_struct	rightEyebrowStruct = getFeatureEyebrow(rightEyebrowLandmarks, leftEyeLandmarks);
+	eyebrow_struct	rightEyebrowStruct = getFeatureEyebrow(rightEyebrowLandmarks, rightEyeLandmarks);
 	mouth_struct	mouthStruct = getFeatureMouth(mouthLandmarks);
 
 	face_struct currentFace =
