@@ -66,7 +66,7 @@ enum EEmotion{
 	SAD = 3,
 	ANGRY = 4,
 	SURPRISED = 5,
-	SCARED = 6
+	DOUBT = 6
 };
 
 struct eye_struct{
@@ -154,7 +154,7 @@ void inputFace(face_struct currentFace, EEmotion emotion);
 // s -> Next emotion
 bool inputMode = false;
 face_struct newFace = face_struct{};
-EEmotion emotionList[6] = { HAPPY, SAD, ANGRY, SURPRISED, SCARED, NEUTRAL };
+EEmotion emotionList[6] = { HAPPY, SAD, ANGRY, SURPRISED, DOUBT, NEUTRAL };
 int choiceEmotion = 0;
 
 
@@ -181,7 +181,7 @@ void init(){
 	emotionMap[EEmotion::SAD] = "Sad";
 	emotionMap[EEmotion::ANGRY] = "Angry";
 	emotionMap[EEmotion::SURPRISED] = "Surprised";
-	emotionMap[EEmotion::SCARED] = "Scared";
+	emotionMap[EEmotion::DOUBT] = "Doubt";
 	emotionMap[EEmotion::NEUTRAL] = "Neutral";
 
 	//Populate Faces
@@ -756,23 +756,23 @@ void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks){
 			distanceGambiarra[emotionMap[EEmotion::SAD]] +
 			distanceGambiarra[emotionMap[EEmotion::SURPRISED]] +
 			distanceGambiarra[emotionMap[EEmotion::ANGRY]] +
-			distanceGambiarra[emotionMap[EEmotion::SCARED]] +
+			distanceGambiarra[emotionMap[EEmotion::DOUBT]] +
 			distanceGambiarra[emotionMap[EEmotion::NEUTRAL]] +
 			distanceGambiarra[emotionMap[EEmotion::UNKNOWN]];
-
+		
 #if KNN
-		cv::putText(img, "Happy:     " + to_string(roundf((double)distanceGambiarra[emotionMap[EEmotion::HAPPY]])) + "%", Point2i(20, initY + 6 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Sad:       " + to_string(roundf((double)distanceGambiarra[emotionMap[EEmotion::SAD]])) + "%", Point2i(20, initY + 7 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Surprised: " + to_string(roundf(distanceGambiarra[emotionMap[EEmotion::SURPRISED]])) + "%", Point2i(20, initY + 8 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Angry:     " + to_string(roundf(distanceGambiarra[emotionMap[EEmotion::ANGRY]])) + "%", Point2i(20, initY + 9 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Scared:    " + to_string(roundf(distanceGambiarra[emotionMap[EEmotion::SCARED]])) + "%", Point2i(20, initY + 10 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Neutral:   " + to_string(roundf(distanceGambiarra[emotionMap[EEmotion::NEUTRAL]])) + "%", Point2i(20, initY + 11 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Happy:     " + to_string((double)distanceGambiarra[emotionMap[EEmotion::HAPPY]]).substr(0, 4) + "%", Point2i(20, initY + 6 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Sad:       " + to_string((double)distanceGambiarra[emotionMap[EEmotion::SAD]]).substr(0, 4) + "%", Point2i(20, initY + 7 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Surprised: " + to_string(distanceGambiarra[emotionMap[EEmotion::SURPRISED]]).substr(0, 4) + "%", Point2i(20, initY + 8 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Angry:     " + to_string(distanceGambiarra[emotionMap[EEmotion::ANGRY]]).substr(0, 4) + "%", Point2i(20, initY + 9 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Doubt:    " + to_string(distanceGambiarra[emotionMap[EEmotion::DOUBT]]).substr(0, 4) + "%", Point2i(20, initY + 10 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Neutral:   " + to_string(distanceGambiarra[emotionMap[EEmotion::NEUTRAL]]).substr(0, 4) + "%", Point2i(20, initY + 11 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 #else
 		cv::putText(img, "Happy:     " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::HAPPY]] * 100 / totalDistance)) + "%", Point2i(20, initY + 6 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 		cv::putText(img, "Sad:       " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SAD]] * 100 / totalDistance)) + "%", Point2i(20, initY + 7 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 		cv::putText(img, "Surprised: " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SURPRISED]] * 100 / totalDistance)) + "%", Point2i(20, initY + 8 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 		cv::putText(img, "Angry:     " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::ANGRY]] * 100 / totalDistance)) + "%", Point2i(20, initY + 9 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
-		cv::putText(img, "Scared:    " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::SCARED]] * 100 / totalDistance)) + "%", Point2i(20, initY + 10 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
+		cv::putText(img, "Doubt:    " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::DOUBT]] * 100 / totalDistance)) + "%", Point2i(20, initY + 10 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 		cv::putText(img, "Neutral:   " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::NEUTRAL]] * 100 / totalDistance)) + "%", Point2i(20, initY + 11 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 		//cv::putText(img, "Unknown:   " + to_string(100 - (distanceGambiarra[emotionMap[EEmotion::UNKNOWN]]	 *100/totalDistance)) + "%"	, Point2i(20, initY + 12 * dist), CV_FONT_NORMAL, 0.5, Scalar(0, 0, 255));
 		
@@ -784,7 +784,7 @@ void showImageWithLandMarks(Mat capturedImage, vector<Point2i> landMarks){
 			newFace = actualFace;
 			cv::putText(img, "INPUT MODE", Point2i(20, 300), CV_FONT_NORMAL, 0.6, Scalar(255, 0, 255));
 			cv::putText(img, "Inputing Face as emotion: " + to_string(choiceEmotion), Point2i(20, 320), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
-			cv::putText(img, "0-HAPPY|1-SAD|2-ANGRY|3-SURPRISED|4-SCARED|5-NEUTRAL", Point2i(20, 340), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
+			cv::putText(img, "0-HAPPY | 1-SAD | 2-ANGRY | 3-SURPRISED | 4-DOUBT | 5-NEUTRAL", Point2i(20, 340), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
 			cv::putText(img, "a - Adds current face. s - Cycle through emotions d - Export faces", Point2i(20, 360), CV_FONT_NORMAL, 0.5, Scalar(255, 0, 255));
 		}
 
@@ -1200,7 +1200,7 @@ void populateFaces(){
 			else if (cell == emotionMap[EEmotion::HAPPY])	 { emotion = HAPPY; }
 			else if (cell == emotionMap[EEmotion::ANGRY])	 { emotion = ANGRY; }
 			else if (cell == emotionMap[EEmotion::SURPRISED]){ emotion = SURPRISED; }
-			else if (cell == emotionMap[EEmotion::SCARED])	 { emotion = SCARED; }
+			else if (cell == emotionMap[EEmotion::DOUBT])	 { emotion = DOUBT; }
 			else if (cell == emotionMap[EEmotion::NEUTRAL])	 { emotion = NEUTRAL; }
 
 			std::getline(lineStream, cell, ',');
